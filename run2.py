@@ -34,21 +34,6 @@ class Graph:
             return
         self.nodes[edge].remove(gate)
 
-def dfs_lexicographic_path(graph, start, target, visited=None) -> List:
-    if visited is None:
-        visited = set()
-    visited.add(start)
-
-    if start == target:
-        return [start]
-
-    for neighbor in sorted(graph.get(start, [])):
-        if neighbor not in visited:
-            subpath = dfs_lexicographic_path(graph, neighbor, target, visited)
-            if subpath is not None:
-                return [start] + subpath
-
-    return None
 
 def choose_virus_path(adj: Dict[str, Set[str]], start: str) -> List[str]:
 
@@ -78,13 +63,10 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
     graph = Graph()
     result = []
 
-
     for edge in edges:
         for e in edge:
             graph.add_vertex(e)
             graph.add_edge(edge)
-
-    # сюда цикл
 
     start = 'a'
     isolated = False
