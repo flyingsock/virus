@@ -70,15 +70,15 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
 
     start = 'a'
     isolated = False
-    count = 1
+
     while not isolated:
         planned_path = choose_virus_path(graph.show_nodes(), start)
-        isolated = True if len(planned_path) == 0 else False
+        isolated = len(planned_path) == 0
         if not isolated:
             graph.pop_edge(planned_path[-2], planned_path[-1])
             result.append(planned_path[-2:][::-1])
         actual_path = choose_virus_path(graph.show_nodes(), start)
-        isolated = True if len(actual_path) == 0 else False
+        isolated = len(actual_path) == 0
 
         if not isolated:
             start = actual_path[1]
