@@ -129,10 +129,10 @@ def main():
     for edge in result:
         print(edge)
 
-    result = solve(edges)
-    for edge in result:
-        edge = '-'.join(edge)
-        print(edge)
+    # result = solve(edges)
+    # for edge in result:
+    #     edge = '-'.join(edge)
+    #     print(edge)
 
 if __name__ == "__main__":
     main()
