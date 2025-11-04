@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-import sys
 from heapq import heappush, heappop
 
 
@@ -76,63 +74,3 @@ def build_net(edges: list[tuple[str, str]]) -> Net:
         adjacency[start].append(end)
 
     return Net(adjacency)
-
-def solve(edges: list[tuple[str, str]]) -> list[str]:
-    """
-    Решение задачи об изоляции вируса
-
-    Args:
-        edges: список коридоров в формате (узел1, узел2)
-
-    Returns:
-        список отключаемых коридоров в формате "Шлюз-узел"
-    """
-
-    result = []
-    given_net = build_net(edges)
-    start = 'a'
-    isolated = False
-
-    while not isolated:
-        # Отключить коридор перед шлюзом
-
-        # Чтобы отключить коридор, надо найти шлюз куда попрётся вирус
-        # Если идти некуда - значит, вирус изолирован
-        planned_path = given_net.choose_gate_path(start)
-        isolated = len(planned_path) == 0
-
-        if not isolated:
-            gate_node, gate = planned_path[-2], planned_path[-1]
-            given_net.close_gateway(gate_node, gate)
-            result.append(f'{gate}-{gate_node}')
-
-        # Переместить вирус
-        actual_path = given_net.choose_gate_path(start)
-        isolated = len(actual_path) == 0
-
-        if not isolated:
-            start = actual_path[1]
-
-    return result
-
-
-def main():
-    edges = []
-    for line in sys.stdin:
-        line = line.strip()
-        if line:
-            node1, sep, node2 = line.partition('-')
-            if sep:
-                edges.append((node1, node2))
-
-    result = solve(edges)
-    for edge in result:
-        print(edge)
-
-    result = solve(edges)
-    for edge in result:
-        edge = '-'.join(edge)
-        print(edge)
-
-if __name__ == "__main__":
-    main()
