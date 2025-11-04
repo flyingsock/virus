@@ -1,95 +1,121 @@
 import sys
-from collections import deque
+from collections import deque, defaultdict
 
 
-def is_gate(node: str) -> bool:
+def is_gateway(node: str) -> bool:
     return node.isupper()
 
 
-def bfs_distances(graph, start):
+def build_graph(edges):
+    graph = defaultdict(set)
+    for u, v in edges:
+        graph[u].add(v)
+        graph[v].add(u)
+    return graph
+
+
+def bfs_distances(graph, start, targets):
+    if not targets:
+        return {}
+    queue = deque([(start, 0)])
     dist = {start: 0}
-    q = deque([start])
-    while q:
-        u = q.popleft()
-        for v in graph[u]:
-            if v not in dist:
-                dist[v] = dist[u] + 1
-                q.append(v)
-    return dist
+    found = {}
+    while queue:
+        node, d = queue.popleft()
+        if node in targets:
+            found[node] = d
+        for nb in graph[node]:
+            if nb not in dist:
+                dist[nb] = d + 1
+                queue.append((nb, d + 1))
+    return found
 
 
-def find_next_virus_position(graph, virus_pos):
-    dist_from_virus = bfs_distances(graph, virus_pos)
-    gate_distances = {
-        node: d for node, d in dist_from_virus.items() if is_gate(node)
-    }
-
-    if not gate_distances:
+def get_next_move(graph, current, gateways):
+    distances = bfs_distances(graph, current, gateways)
+    if not distances:
         return None
+    min_dist = min(distances.values())
+    closest_gateways = [g for g, d in distances.items() if d == min_dist]
+    target_gateway = min(closest_gateways)
 
-    min_dist = min(gate_distances.values())
-    target_gate = min(gate for gate, d in gate_distances.items() if d == min_dist)
+    # Compute distances from target_gateway to all nodes
+    queue = deque([(target_gateway, 0)])
+    dist_to_target = {target_gateway: 0}
+    while queue:
+        node, d = queue.popleft()
+        for nb in graph[node]:
+            if nb not in dist_to_target:
+                dist_to_target[nb] = d + 1
+                queue.append((nb, d + 1))
 
-    dist_from_gate = bfs_distances(graph, target_gate)
     candidates = []
-    for neighbor in graph[virus_pos]:
-        if (neighbor in dist_from_virus and
-                neighbor in dist_from_gate and
-                dist_from_virus[neighbor] == dist_from_virus[virus_pos] + 1 and
-                dist_from_gate[neighbor] == min_dist - 1):
-            candidates.append(neighbor)
-
-    return min(candidates) if candidates else None
+    for nb in graph[current]:
+        if nb in dist_to_target and dist_to_target[nb] == min_dist - 1:
+            candidates.append(nb)
+    if not candidates:
+        return None
+    return min(candidates)
 
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
-    # Построим граф как словарь множеств
-    graph = {}
+    graph = build_graph(edges)
+    all_nodes = set()
     for u, v in edges:
-        if u not in graph:
-            graph[u] = set()
-        if v not in graph:
-            graph[v] = set()
-        graph[u].add(v)
-        graph[v].add(u)
-
+        all_nodes.add(u)
+        all_nodes.add(v)
+    gateways = {node for node in all_nodes if is_gateway(node)}
     virus_pos = 'a'
     result = []
 
     while True:
-        # Собираем все возможные коридоры для отключения: (шлюз, обычный_узел)
+        # Determine active gateways (still connected to the graph)
+        active_gateways = set()
+        for g in gateways:
+            if g in graph and any(not is_gateway(nb) for nb in graph[g]):
+                active_gateways.add(g)
+
+        if not active_gateways:
+            break
+
+        # Find reachable gateways from current virus position
+        distances = bfs_distances(graph, virus_pos, active_gateways)
+        if not distances:
+            break
+
+        min_dist = min(distances.values())
+        closest_gateways = [g for g, d in distances.items() if d == min_dist]
+        target_gateway = min(closest_gateways)
+
+        # Collect all active edges from target_gateway to regular nodes
         candidates = []
-        for node in graph:
-            if is_gate(node):
-                for neighbor in graph[node]:
-                    if not is_gate(neighbor):
-                        candidates.append((node, neighbor))
+        if target_gateway in graph:
+            for nb in graph[target_gateway]:
+                if not is_gateway(nb):
+                    candidates.append((target_gateway, nb))
 
-        # Если нет коридоров шлюзов — задача решена
         if not candidates:
-            break
+            # Gateway is already isolated; move virus and continue
+            next_pos = get_next_move(graph, virus_pos, active_gateways)
+            if next_pos is None:
+                break
+            virus_pos = next_pos
+            continue
 
-        # Сортируем лексикографически: сначала по шлюзу, потом по узлу
-        candidates.sort()
+        # Choose lexicographically smallest edge
+        candidates.sort(key=lambda x: (x[0], x[1]))
+        chosen = candidates[0]
 
-        # Выбираем первое действие (гарантированно безопасное по условию задачи)
-        gate, node = candidates[0]
-        result.append(f"{gate}-{node}")
+        # Disconnect the edge
+        result.append(f"{chosen[0]}-{chosen[1]}")
+        graph[chosen[0]].discard(chosen[1])
+        graph[chosen[1]].discard(chosen[0])
 
-        # Применяем отключение в основном графе
-        graph[gate].discard(node)
-        graph[node].discard(gate)
-
-        # Симулируем ход вируса в обновлённом графе
-        next_pos = find_next_virus_position(graph, virus_pos)
+        # Move virus
+        next_pos = get_next_move(graph, virus_pos, active_gateways)
         if next_pos is None:
-            break  # Вирус изолирован
-        virus_pos = next_pos
-
-        # Дополнительная проверка: если из текущей позиции нет путей до шлюзов — завершаем
-        dist_check = bfs_distances(graph, virus_pos)
-        if not any(is_gate(n) for n in dist_check):
             break
+        virus_pos = next_pos
 
     return result
 
