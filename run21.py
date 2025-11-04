@@ -12,6 +12,68 @@ import heapq
 # Закрыть
 from typing import Dict, List, Tuple, Set
 import sys
+from collections import deque
+
+
+def is_gate(node: str) -> bool:
+    return node.isupper()
+
+
+def bfs_distances(graph, start):
+    """Возвращает словарь расстояний от start до всех достижимых узлов."""
+    dist = {start: 0}
+    q = deque([start])
+    while q:
+        u = q.popleft()
+        for v in graph[u]:
+            if v not in dist:
+                dist[v] = dist[u] + 1
+                q.append(v)
+    return dist
+
+
+def find_next_virus_position(graph, virus_pos):
+    """Возвращает следующую позицию вируса согласно правилам."""
+    dist_from_virus = bfs_distances(graph, virus_pos)
+
+    # Собираем все шлюзы и их расстояния
+    gate_distances = {}
+    for node, d in dist_from_virus.items():
+        if is_gate(node):
+            gate_distances[node] = d
+
+    if not gate_distances:
+        return None  # Вирус изолирован
+
+    min_dist = min(gate_distances.values())
+    # Выбираем лексикографически наименьший шлюз с минимальным расстоянием
+    target_gate = min(gate for gate, d in gate_distances.items() if d == min_dist)
+
+    # Получаем расстояния от целевого шлюза ко всем узлам
+    dist_from_gate = bfs_distances(graph, target_gate)
+
+    # Соседи текущей позиции, лежащие на кратчайшем пути к target_gate
+    candidates = []
+    for neighbor in graph[virus_pos]:
+        # Проверяем: лежит ли neighbor на кратчайшем пути?
+        if (neighbor in dist_from_virus and
+                neighbor in dist_from_gate and
+                dist_from_virus[neighbor] == dist_from_virus[virus_pos] + 1 and
+                dist_from_gate[neighbor] == min_dist - 1):
+            candidates.append(neighbor)
+
+    if not candidates:
+        # Fallback: просто выбираем любого соседа, ведущего к шлюзам (редкий случай)
+        for neighbor in sorted(graph[virus_pos]):
+            # Проверим, есть ли путь от neighbor до любого шлюза
+            dist_nb = bfs_distances(graph, neighbor)
+            if any(is_gate(n) for n in dist_nb):
+                return neighbor
+        # Если совсем нет — выбираем лексикографически наименьшего соседа
+        return min(graph[virus_pos])
+
+    return min(candidates)  # лексикографически наименьший
+
 
 class Graph:
     def __init__(self):
@@ -115,15 +177,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# a-b
-# b-c
-# c-d
-# c-e
-# A-d
-# A-e
-# c-f
-# c-g
-# f-B
-# g-B
