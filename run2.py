@@ -3,7 +3,6 @@ from collections import deque, defaultdict
 
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
-    # Убираем пробелы
     edges = [(u.strip(), v.strip()) for u, v in edges]
 
     graph = defaultdict(set)
@@ -11,74 +10,84 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
         graph[u].add(v)
         graph[v].add(u)
 
-    # Выделяем шлюзы
     gates = {node for node in graph if node.isupper()}
     virus = 'a'
     result = []
 
     while True:
-        # === 1. Найти ближайший шлюз ===
         # BFS от вируса
-        dist_v = {virus: 0}
+        dist = {virus: 0}
         q = deque([virus])
         while q:
             u = q.popleft()
             for v in graph[u]:
-                if v not in dist_v:
-                    dist_v[v] = dist_v[u] + 1
+                if v not in dist:
+                    dist[v] = dist[u] + 1
                     q.append(v)
 
-        # Достижимые шлюзы
-        reachable_gates = {g: dist_v[g] for g in gates if g in dist_v}
-        if not reachable_gates:
+        # Собираем шлюзы с их d и r
+        gate_info = []
+        for gate in gates:
+            if gate in dist:
+                d = dist[gate]
+                r = sum(1 for nb in graph[gate] if not nb.isupper())
+                if r > 0:
+                    gate_info.append((gate, d, r))
+
+        if not gate_info:
             break
 
-        min_dist = min(reachable_gates.values())
-        # Среди шлюзов с min_dist — лексикографически наименьший
-        target_gate = min(g for g, d in reachable_gates.items() if d == min_dist)
+        # Ищем шлюзы с d == 1 (немедленная угроза)
+        imminent = [(g, d, r) for g, d, r in gate_info if d == 1]
 
-        # === 2. Найти следующий шаг вируса ===
-        # BFS от целевого шлюза
-        dist_g = {target_gate: 0}
+        if imminent:
+            # Выбираем лексикографически наименьший шлюз
+            imminent.sort(key=lambda x: x[0])
+            gate = imminent[0][0]
+        else:
+            # Нет угрозы — выбираем лексикографически наименьший шлюз вообще
+            gate_info.sort(key=lambda x: x[0])
+            gate = gate_info[0][0]
+
+        # Отключаем лексикографически наименьший коридор от этого шлюза
+        neighbors = [nb for nb in graph[gate] if not nb.isupper()]
+        if not neighbors:
+            break
+        neighbors.sort()
+        node = neighbors[0]
+        result.append(f"{gate}-{node}")
+        graph[gate].discard(node)
+        graph[node].discard(gate)
+
+        # Теперь — ход вируса (по его правилам)
+        # Найдем цель: ближайший шлюз (даже если мы только что отключили коридор)
+        reachable_gates = {g: dist[g] for g in gates if g in dist}
+        if not reachable_gates:
+            break
+        min_d = min(reachable_gates.values())
+        target_gate = min(g for g, d in reachable_gates.items() if d == min_d)
+
+        # BFS от target_gate
+        dist_gate = {target_gate: 0}
         q = deque([target_gate])
         while q:
             u = q.popleft()
             for v in graph[u]:
-                if v not in dist_g:
-                    dist_g[v] = dist_g[u] + 1
+                if v not in dist_gate:
+                    dist_gate[v] = dist_gate[u] + 1
                     q.append(v)
 
-        # Соседи вируса, ведущие к target_gate по кратчайшему пути
-        next_candidates = []
+        next_virus = None
+        current_d = dist_gate.get(virus, float('inf'))
         for nb in graph[virus]:
             if nb.isupper():
-                continue  # вирус не ходит в шлюзы
-            if dist_g.get(nb, -1) == dist_g.get(virus, -2) - 1:
-                next_candidates.append(nb)
+                continue
+            if dist_gate.get(nb, float('inf')) == current_d - 1:
+                if next_virus is None or nb < next_virus:
+                    next_virus = nb
 
-        if not next_candidates:
+        if next_virus is None:
             break
-        next_virus = min(next_candidates)
-
-        # === 3. Отключить лексикографически наименьший коридор от target_gate ===
-        corridors = []
-        for nb in graph[target_gate]:
-            if not nb.isupper():
-                corridors.append((target_gate, nb))
-
-        if not corridors:
-            # Шлюз уже отключён — просто двигаемся
-            virus = next_virus
-            continue
-
-        corridors.sort()
-        gate, node = corridors[0]
-        result.append(f"{gate}-{node}")
-        # Отключаем
-        graph[gate].discard(node)
-        graph[node].discard(gate)
-
-        # === 4. Вирус делает ход ===
         virus = next_virus
 
     return result
