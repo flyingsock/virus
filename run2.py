@@ -67,8 +67,8 @@ def is_safe_to_cut(graph, virus_pos, gate, node):
 
     return True
 
-
 def solve(edges: list[tuple[str, str]]) -> list[str]:
+    # Строим граф как defaultdict(set)
     graph = defaultdict(set)
     for u, v in edges:
         graph[u].add(v)
@@ -78,43 +78,47 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
     result = []
 
     while True:
-        # Найти ближайший шлюз
-        dist_from_virus = bfs_distances(graph, virus_pos)
-        gate_distances = {n: d for n, d in dist_from_virus.items() if is_gate(n)}
-        if not gate_distances:
+        # Собираем все активные коридоры от шлюзов к обычным узлам
+        all_candidates = []
+        for node in list(graph.keys()):
+            if is_gate(node):
+                for neighbor in list(graph[node]):
+                    if not is_gate(neighbor):
+                        all_candidates.append((node, neighbor))
+
+        if not all_candidates:
             break
 
-        min_dist = min(gate_distances.values())
-        closest_gates = [g for g, d in gate_distances.items() if d == min_dist]
-        target_gate = min(closest_gates)
+        # Фильтруем только безопасные
+        safe_candidates = []
+        for gate, node in all_candidates:
+            if is_safe_to_cut(graph, virus_pos, gate, node):
+                safe_candidates.append((gate, node))
 
-        # Кандидаты — только коридоры от target_gate
-        candidates = []
-        for nb in graph[target_gate]:
-            if not is_gate(nb):
-                candidates.append((target_gate, nb))
+        # По условию задачи, хотя бы один безопасный существует
+        if not safe_candidates:
+            # На всякий случай — выбираем любой (не должно происходить)
+            safe_candidates = all_candidates
 
-        if not candidates:
-            # Шлюз уже отключён — переходим к следующему ходу вируса
-            next_pos = find_next_virus_position(graph, virus_pos)
-            if next_pos is None:
-                break
-            virus_pos = next_pos
-            continue
+        # Выбираем лексикографически наименьший
+        safe_candidates.sort()
+        gate, node = safe_candidates[0]
 
-        # Выбираем лексикографически наименьший коридор от этого шлюза
-        candidates.sort(key=lambda x: (x[0], x[1]))
-        gate, node = candidates[0]
-
+        # Применяем отключение
         result.append(f"{gate}-{node}")
         graph[gate].discard(node)
         graph[node].discard(gate)
 
-        # Ход вируса
+        # Вирус делает ход
         next_pos = find_next_virus_position(graph, virus_pos)
         if next_pos is None:
             break
         virus_pos = next_pos
+
+        # Дополнительная проверка: если из новой позиции нет шлюзов — завершаем
+        dist_check = bfs_distances(graph, virus_pos)
+        if not any(is_gate(n) for n in dist_check):
+            break
 
     return result
 
