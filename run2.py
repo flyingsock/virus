@@ -4,26 +4,18 @@ from collections import deque, defaultdict
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
     edges = [(u.strip(), v.strip()) for u, v in edges]
+
     graph = defaultdict(set)
     for u, v in edges:
         graph[u].add(v)
         graph[v].add(u)
 
-    gates = {n for n in graph if n.isupper()}
+    gates = {node for node in graph if node.isupper()}
     virus = 'a'
     result = []
 
     while True:
-        # Get all gate links
-        candidates = []
-        for gate in gates:
-            for nb in graph[gate]:
-                if not nb.isupper():
-                    candidates.append((gate, nb))
-        if not candidates:
-            break
-
-        # BFS from virus
+        # BFS от вируса
         dist = {virus: 0}
         q = deque([virus])
         while q:
@@ -33,47 +25,51 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
                     dist[v] = dist[u] + 1
                     q.append(v)
 
-        # Find gates at distance 1
-        threat = []
+        # Собираем шлюзы с их d и r
+        gate_info = []
         for gate in gates:
-            if gate in dist and dist[gate] == 1:
-                threat.append(gate)
+            if gate in dist:
+                d = dist[gate]
+                r = sum(1 for nb in graph[gate] if not nb.isupper())
+                if r > 0:
+                    gate_info.append((gate, d, r))
 
-        if threat:
-            threat.sort()
-            gate = threat[0]
-        else:
-            candidates.sort()
-            gate = candidates[0][0]
-
-        # Cut lex smallest link from gate
-        links = [nb for nb in graph[gate] if not nb.isupper()]
-        if not links:
+        if not gate_info:
             break
-        links.sort()
-        node = links[0]
+
+        # Ищем шлюзы с d == 1 (немедленная угроза)
+        imminent = [(g, d, r) for g, d, r in gate_info if d == 1]
+
+        if imminent:
+            # Выбираем лексикографически наименьший шлюз
+            imminent.sort(key=lambda x: x[0])
+            gate = imminent[0][0]
+        else:
+            # Нет угрозы — выбираем лексикографически наименьший шлюз вообще
+            gate_info.sort(key=lambda x: x[0])
+            gate = gate_info[0][0]
+
+        # Отключаем лексикографически наименьший коридор от этого шлюза
+        neighbors = [nb for nb in graph[gate] if not nb.isupper()]
+        if not neighbors:
+            break
+        neighbors.sort()
+        node = neighbors[0]
         result.append(f"{gate}-{node}")
         graph[gate].discard(node)
         graph[node].discard(gate)
 
-        # Move virus
-        dist = {virus: 0}
-        q = deque([virus])
-        while q:
-            u = q.popleft()
-            for v in graph[u]:
-                if v not in dist:
-                    dist[v] = dist[u] + 1
-                    q.append(v)
-
+        # Теперь — ход вируса (по его правилам)
+        # Найдем цель: ближайший шлюз (даже если мы только что отключили коридор)
         reachable_gates = {g: dist[g] for g in gates if g in dist}
         if not reachable_gates:
             break
         min_d = min(reachable_gates.values())
-        target = min(g for g, d in reachable_gates.items() if d == min_d)
+        target_gate = min(g for g, d in reachable_gates.items() if d == min_d)
 
-        dist_gate = {target: 0}
-        q = deque([target])
+        # BFS от target_gate
+        dist_gate = {target_gate: 0}
+        q = deque([target_gate])
         while q:
             u = q.popleft()
             for v in graph[u]:
@@ -81,16 +77,18 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
                     dist_gate[v] = dist_gate[u] + 1
                     q.append(v)
 
-        next_v = None
+        next_virus = None
+        current_d = dist_gate.get(virus, float('inf'))
         for nb in graph[virus]:
             if nb.isupper():
                 continue
-            if dist_gate.get(nb, -1) == dist_gate.get(virus, -2) - 1:
-                if next_v is None or nb < next_v:
-                    next_v = nb
-        if next_v is None:
+            if dist_gate.get(nb, float('inf')) == current_d - 1:
+                if next_virus is None or nb < next_virus:
+                    next_virus = nb
+
+        if next_virus is None:
             break
-        virus = next_v
+        virus = next_virus
 
     return result
 
@@ -100,12 +98,12 @@ def main():
     for line in sys.stdin:
         line = line.strip()
         if line:
-            parts = line.split('-')
-            if len(parts) == 2:
-                edges.append((parts[0], parts[1]))
+            node1, sep, node2 = line.partition('-')
+            if sep:
+                edges.append((node1, node2))
     result = solve(edges)
-    for r in result:
-        print(r)
+    for edge in result:
+        print(edge)
 
 
 if __name__ == "__main__":
