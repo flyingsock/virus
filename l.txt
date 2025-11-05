@@ -108,7 +108,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-   (80)
+   (60)
 import sys
 from collections import deque, defaultdict
 
