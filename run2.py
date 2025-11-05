@@ -16,7 +16,6 @@ def bfs_distances(graph, start):
     return dist
 
 def find_next_virus_position(graph, virus_pos):
-    # Находим все шлюзы и расстояния до них
     dist_from_virus = bfs_distances(graph, virus_pos)
     gate_distances = {
         node: d for node, d in dist_from_virus.items() if is_gate(node)
@@ -27,12 +26,12 @@ def find_next_virus_position(graph, virus_pos):
     min_dist = min(gate_distances.values())
     target_gate = min(gate for gate, d in gate_distances.items() if d == min_dist)
 
-    # BFS от шлюза, чтобы знать расстояния до него
     dist_from_gate = bfs_distances(graph, target_gate)
 
     candidates = []
     for neighbor in graph[virus_pos]:
-        # Проверяем, лежит ли neighbor на кратчайшем пути к target_gate
+        if is_gate(neighbor):
+            continue  # вирус ходит только по обычным узлам
         if dist_from_gate.get(neighbor, float('inf')) == min_dist - 1:
             candidates.append(neighbor)
 
