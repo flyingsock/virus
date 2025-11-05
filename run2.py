@@ -66,8 +66,8 @@ def is_safe_to_cut(graph, virus_pos, gate, node):
 
     return True
 
+
 def solve(edges: list[tuple[str, str]]) -> list[str]:
-    # Строим граф как defaultdict(set)
     graph = defaultdict(set)
     for u, v in edges:
         graph[u].add(v)
@@ -77,47 +77,52 @@ def solve(edges: list[tuple[str, str]]) -> list[str]:
     result = []
 
     while True:
-        # Собираем все активные коридоры от шлюзов к обычным узлам
+        # Собираем все активные шлюзовые коридоры
+        gate_corridors = defaultdict(list)
         all_candidates = []
         for node in list(graph.keys()):
             if is_gate(node):
-                for neighbor in list(graph[node]):
-                    if not is_gate(neighbor):
-                        all_candidates.append((node, neighbor))
+                for nb in list(graph[node]):
+                    if not is_gate(nb):
+                        gate_corridors[node].append(nb)
+                        all_candidates.append((node, nb))
 
         if not all_candidates:
             break
 
-        # Фильтруем только безопасные
-        safe_candidates = []
-        for gate, node in all_candidates:
-            if is_safe_to_cut(graph, virus_pos, gate, node):
-                safe_candidates.append((gate, node))
+        # Найдём расстояния от вируса до всех узлов
+        dist_virus = bfs_distances(graph, virus_pos)
+        gate_distances = {g: dist_virus[g] for g in gate_corridors if g in dist_virus}
 
-        # По условию задачи, хотя бы один безопасный существует
-        if not safe_candidates:
-            # На всякий случай — выбираем любой (не должно происходить)
-            safe_candidates = all_candidates
+        # Найдём критические шлюзы: r > d
+        critical_gates = set()
+        for gate, corridors in gate_corridors.items():
+            if gate in gate_distances:
+                d = gate_distances[gate]
+                r = len(corridors)
+                if r > d:
+                    critical_gates.add(gate)
 
-        # Выбираем лексикографически наименьший
-        safe_candidates.sort()
-        gate, node = safe_candidates[0]
+        if critical_gates:
+            # Выбираем коридоры только от критических шлюзов
+            candidates = [(g, n) for g, n in all_candidates if g in critical_gates]
+        else:
+            # Нет критических — можно выбирать любой
+            candidates = all_candidates
 
-        # Применяем отключение
+        # Сортируем и выбираем лексикографически наименьший
+        candidates.sort()
+        gate, node = candidates[0]
+
         result.append(f"{gate}-{node}")
         graph[gate].discard(node)
         graph[node].discard(gate)
 
-        # Вирус делает ход
+        # Ход вируса
         next_pos = find_next_virus_position(graph, virus_pos)
         if next_pos is None:
             break
         virus_pos = next_pos
-
-        # Дополнительная проверка: если из новой позиции нет шлюзов — завершаем
-        dist_check = bfs_distances(graph, virus_pos)
-        if not any(is_gate(n) for n in dist_check):
-            break
 
     return result
 
