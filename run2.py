@@ -14,7 +14,6 @@
 import heapq
 from typing import Dict, List, Tuple, Set
 import sys
-from collections import deque
 
 
 class Graph:
@@ -65,71 +64,36 @@ def choose_virus_path(adj: Dict[str, Set[str]], start: str) -> List[str]:
 
 
 def solve(edges: list[tuple[str, str]]) -> list[str]:
-    # Строим граф
-    graph: Dict[str, Set[str]] = {}
-    for u, v in edges:
-        u = u.strip()
-        v = v.strip()
-        if u not in graph:
-            graph[u] = set()
-        if v not in graph:
-            graph[v] = set()
-        graph[u].add(v)
-        graph[v].add(u)
-
-    gates = {node for node in graph if node.isupper()}
-    virus = 'a'
+    graph = Graph()
     result = []
 
-    while True:
-        # 1. Найти текущую цель и следующий шаг
-        dist_v = {virus: 0}
-        q = deque([virus])
-        while q:
-            u = q.popleft()
-            for v in graph[u]:
-                if v not in dist_v:
-                    dist_v[v] = dist_v[u] + 1
-                    q.append(v)
+    for edge in edges:
+        for e in edge:
+            graph.add_vertex(e)
+            graph.add_edge(edge)
 
-        # Достижимые шлюзы
-        reachable_gates = {g: dist_v[g] for g in gates if g in dist_v}
-        if not reachable_gates:
-            break
+    start = 'a'
+    isolated = False
 
-        min_d = min(reachable_gates.values())
-        target_gate = min(g for g, d in reachable_gates.items() if d == min_d)
+    while not isolated:
+        planned_path = choose_virus_path(graph.show_nodes(), start)
+        isolated = len(planned_path) == 0
+        if not isolated:
+            graph.pop_edge(planned_path[-2], planned_path[-1])
+            result.append(planned_path[-2:][::-1])
+        actual_path = choose_virus_path(graph.show_nodes(), start)
+        isolated = len(actual_path) == 0
 
-        # 2. Отключаем лексикографически наименьший коридор от target_gate
-        neighbors = [nb for nb in graph[target_gate] if not nb.isupper()]
-        if neighbors:
-            neighbors.sort()
-            node = neighbors[0]
-            result.append(f"{target_gate}-{node}")
-            graph[target_gate].discard(node)
-            graph[node].discard(target_gate)
+        if not isolated:
+            start = actual_path[1]
 
-        # 3. Делаем один ход вируса
-        dist_g = {target_gate: 0}
-        q = deque([target_gate])
-        while q:
-            u = q.popleft()
-            for v in graph[u]:
-                if v not in dist_g:
-                    dist_g[v] = dist_g[u] + 1
-                    q.append(v)
-
-        next_v = None
-        for nb in graph[virus]:
-            if nb.isupper():
-                continue
-            if dist_g.get(nb, -1) == dist_g.get(virus, -2) - 1:
-                if next_v is None or nb < next_v:
-                    next_v = nb
-
-        if next_v is None:
-            break
-        virus = next_v
+    """
+    Решение задачи об изоляции вируса
+    Args:
+        edges: список коридоров в формате (узел1, узел2)
+    Returns:
+        список отключаемых коридоров в формате "Шлюз-узел"
+    """
 
     return result
 
